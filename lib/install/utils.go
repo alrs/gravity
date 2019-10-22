@@ -297,6 +297,12 @@ func InstallBinary(uid, gid int, logger log.FieldLogger) (err error) {
 		if err == nil {
 			break
 		}
+		logger.WithFields(log.Fields{
+			log.ErrorKey:  err,
+			"uid":         uid,
+			"gid":         gid,
+			"target-path": targetPath,
+		}).Warn("Failed to install binary.")
 	}
 	if err != nil {
 		return trace.Wrap(err, "failed to install gravity binary in any of %v",
@@ -398,7 +404,7 @@ func tryInstallBinary(targetPath string, uid, gid int, logger log.FieldLogger) e
 	}
 	err = os.MkdirAll(filepath.Dir(targetPath), defaults.SharedDirMask)
 	if err != nil {
-		return trace.Wrap(err)
+		return trace.ConvertSystemError(err)
 	}
 	err = utils.CopyFileWithPerms(targetPath, path, defaults.SharedExecutableMask)
 	if err != nil {

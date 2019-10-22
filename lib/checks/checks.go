@@ -34,7 +34,6 @@ import (
 	"github.com/gravitational/gravity/lib/schema"
 	"github.com/gravitational/gravity/lib/state"
 	"github.com/gravitational/gravity/lib/storage"
-	"github.com/gravitational/gravity/lib/system"
 	"github.com/gravitational/gravity/lib/systeminfo"
 	"github.com/gravitational/gravity/lib/utils"
 
@@ -302,9 +301,6 @@ type Features struct {
 	// TestPorts specifies whether the ports availability test should
 	// be executed.
 	TestPorts bool
-	// TestDockerDevice specifies whether the Docker device test should
-	// be executed. Docker device test is only applicable during install.
-	TestDockerDevice bool
 }
 
 // String return textual representation of this server object
@@ -381,17 +377,6 @@ func (r *checker) CheckNode(ctx context.Context, server Server) (failed []*agent
 	}
 
 	dockerConfig := r.Manifest.SystemDocker()
-	if r.TestDockerDevice {
-		err = checkDockerDevice(server, dockerConfig)
-		if err != nil {
-			log.WithError(err).Warn("Failed to validate docker device.")
-			failed = append(failed, &agentpb.Probe{
-				Detail: err.Error(),
-				Error:  "failed to validate docker device",
-			})
-		}
-	}
-
 	err = checkSystemPackages(server, dockerConfig)
 	if err != nil {
 		log.WithError(err).Warn("Failed to validate system packages.")
@@ -484,14 +469,15 @@ func (r *checker) checkDisks(ctx context.Context, server Server) error {
 	for _, target := range targets {
 		var maxBps uint64
 
-		// use the maximum throughput measured over a couple of tests
-		for i := 0; i < 3; i++ {
-			speed, err := r.checkServerDisk(ctx, server.Server, target.path)
-			if err != nil {
-				return trace.Wrap(err)
+			// use the maximum throughput measured over a couple of tests
+			for i := 0; i < 3; i++ {
+				speed, err := r.checkServerDisk(ctx, server.Server, target.path)
+				if err != nil {
+					return trace.Wrap(err, "failed to sample disk performance at %v on %v",
+						target.path, server.ServerInfo.GetHostname())
+				}
+				maxBps = utils.MaxInt64(speed, maxBps)
 			}
-			maxBps = utils.MaxInt64(speed, maxBps)
-		}
 
 		if maxBps < target.rate.BytesPerSecond() {
 			return trace.BadParameter(
@@ -526,7 +512,13 @@ func (r *checker) checkServerDisk(ctx context.Context, server storage.Server, ta
 		"dd", "if=/dev/zero", fmt.Sprintf("of=%v", target),
 		"bs=100K", "count=1024", "conv=fdatasync"}, &out)
 	if err != nil {
-		return 0, trace.Wrap(err)
+		log.WithFields(log.Fields{
+			log.ErrorKey: err,
+			"addr":       server.AdvertiseIP,
+			"target":     target,
+			"output":     out.String(),
+		}).Warn("Failed to sample disk performance.")
+		return 0, trace.Wrap(err, "failed to sample disk performance: %s", out.String())
 	}
 
 	speed, err := utils.ParseDDOutput(out.String())
@@ -544,8 +536,14 @@ func (r *checker) checkTempDir(ctx context.Context, server Server) error {
 
 	err := r.Remote.Exec(ctx, server.AdvertiseIP, []string{"touch", filename}, &out)
 	if err != nil {
-		return trace.BadParameter("couldn't create a test file in temp directory %v on %q: %v",
-			server.TempDir, server.ServerInfo.GetHostname(), out.String())
+		log.WithFields(log.Fields{
+			log.ErrorKey: err,
+			"filename":   filename,
+			"addr":       server.AdvertiseIP,
+			"hostname":   server.ServerInfo.GetHostname(),
+		}).Warn("Failed to create a test file.")
+		return trace.BadParameter("failed to create a test file %v on %q: %v",
+			filepath.Join(server.TempDir, filename), server.ServerInfo.GetHostname(), out.String())
 	}
 
 	err = r.Remote.Exec(ctx, server.AdvertiseIP, []string{"rm", filename}, &out)
@@ -641,52 +639,13 @@ func (r *checker) checkBandwidth(ctx context.Context, servers []Server) error {
 func (r *checker) collectTargets(ctx context.Context, server Server, requirements Requirements) ([]diskCheckTarget, error) {
 	var targets []diskCheckTarget
 
-	remote := &serverRemote{server, r.Remote}
-	// check if there's a system device specified
-	if path := getDevicePath(server.SystemState.Device.Name,
-		storage.DeviceName(server.SystemDevice)); path != "" {
-		filesystem, err := system.GetFilesystem(ctx, path, remote)
-		if err != nil {
-			return nil, trace.Wrap(err)
-		}
-		if filesystem == "" {
-			targets = append(targets, diskCheckTarget{
-				path: path,
-				rate: defaultTransferRate,
-			})
-		}
-	}
-	// if no system device has been specified or it has a filesystem,
-	// use the mount point for the test
-	if len(targets) == 0 {
-		fi, err := systeminfo.FilesystemForDir(server.ServerInfo, server.Server.StateDir())
-		if err != nil {
-			return nil, trace.Wrap(err)
-		}
-		targets = append(targets, diskCheckTarget{
-			path: filepath.Join(fi.Filesystem.DirName, "testfile"),
-			rate: defaultTransferRate,
-		})
-	}
+	// Explicit system state directory disk performance target
+	targets = append(targets, diskCheckTarget{
+		path: filepath.Join(server.Server.StateDir(), "testfile"),
+		rate: defaultTransferRate,
+	})
 
-	// same for the docker device
-	if r.TestDockerDevice {
-		if path := getDevicePath(server.Docker.Device.Name, storage.DeviceName(server.DockerDevice)); path != "" {
-			filesystem, err := system.GetFilesystem(ctx, path, remote)
-			if err != nil {
-				return nil, trace.Wrap(err)
-			}
-			if filesystem != "" {
-				return nil, trace.BadParameter("docker device %v is expected to be unformatted and without a filesystem", path)
-			}
-			targets = append(targets, diskCheckTarget{
-				path: path,
-				rate: defaultTransferRate,
-			})
-		}
-	}
-
-	// add all dirs with their rates from the profile
+	// add all directories with their rates from the profile
 	for _, volume := range requirements.Volumes {
 		if volume.MinTransferRate == 0 {
 			continue
@@ -774,37 +733,6 @@ func checkRAM(info ServerInfo, ram schema.RAM) error {
 
 	log.Infof("Server %q passed RAM check: %v.", info.GetHostname(),
 		humanize.Bytes(info.GetMemory().Total))
-	return nil
-}
-
-// checkDockerDevice makes sure the selected docker device satisfies the profile
-func checkDockerDevice(server Server, docker schema.Docker) error {
-	dockerDevice := storage.DeviceName(server.DockerDevice)
-	if dockerDevice == "" {
-		dockerDevice = server.Docker.Device.Name
-	}
-
-	if dockerDevice == "" {
-		log.Info("Skipping docker device size check as no docker device has been configured.")
-		// do not enforce a size requirement with no device specified
-		return nil
-	}
-
-	device := storage.Devices(server.GetDevices()).GetByName(dockerDevice)
-	if device.Name.Path() == "" {
-		return trace.NotFound("no suitable docker device found")
-	}
-
-	deviceSizeBytes := device.SizeMB * 1000000
-	if deviceSizeBytes < docker.Capacity.Bytes() {
-		return trace.BadParameter("selected docker device for server %q "+
-			"has %v which is less than required %v",
-			server.ServerInfo.GetHostname(),
-			humanize.Bytes(deviceSizeBytes),
-			docker.Capacity.String())
-	}
-
-	log.Infof("Server %q passed docker device check.", server.ServerInfo.GetHostname())
 	return nil
 }
 

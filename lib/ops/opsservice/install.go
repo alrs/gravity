@@ -504,11 +504,6 @@ func (s *site) checkOnPremServers(req ops.OperationUpdateRequest) error {
 		if !ok {
 			return trace.BadParameter("unknown server role %v for %v", server.Role, server)
 		}
-		if server.SystemState.Device.Path() == server.Docker.Device.Path() && server.Docker.Device.Path() != "" {
-			return trace.BadParameter(
-				"cannot use the same device %q for system and docker configuration",
-				server.Docker.Device)
-		}
 	}
 
 	return nil
@@ -663,18 +658,11 @@ func (s *site) configureOnPremServers(ctx *operationContext, servers []storage.S
 		if err != nil {
 			return nil, trace.Wrap(err)
 		}
-		systemDevice := server.SystemState.Device.Name
-		if systemDevice.Path() == "" {
-			systemDevice = storage.DeviceName(info.SystemDevice)
-		}
-		servers[i].SystemState.Device = info.GetDevices().GetByName(systemDevice)
 		servers[i].SystemState.StateDir = info.StateDir
 		dockerDevice := server.Docker.Device.Name
 		if dockerDevice.Path() == "" {
 			dockerDevice = storage.DeviceName(info.DockerDevice)
 		}
-		servers[i].Docker.Device = info.GetDevices().GetByName(dockerDevice)
-		servers[i].Docker.LVMSystemDirectory = info.GetLVMSystemDirectory()
 		servers[i].User = info.GetUser()
 		servers[i].Provisioner = schema.ProvisionerOnPrem
 		servers[i].Created = time.Now().UTC()
@@ -891,6 +879,7 @@ func (s *site) newProvisioningToken(operation ops.SiteOperation) (token string, 
 		Type:        storage.ProvisioningTokenTypeExpand,
 		OperationID: operation.ID,
 		UserEmail:   agentUser.GetName(),
+		Upsert:      true,
 	}
 	if operation.Type == ops.OperationExpand {
 		// Set a TTL for expand provisioning token.

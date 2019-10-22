@@ -75,9 +75,6 @@ WantedBy={{.WantedBy}}
 {{end}}
 `
 
-	// Should we make the target configurable too?
-	systemdUnitFileDir = "/etc/systemd/system/"
-
 	systemdUnitFileSuffix = ".service"
 
 	systemdServiceDelimiter = "__"
@@ -160,7 +157,7 @@ func (s *systemdManager) installService(service serviceTemplate, req NewServiceR
 }
 
 func (s *systemdManager) installMountService(service mountServiceTemplate, noBlock bool) error {
-	servicePath := filepath.Join(systemdUnitFileDir, SystemdNameEscape(service.Name))
+	servicePath := filepath.Join(defaults.SystemUnitDir, SystemdNameEscape(service.Name))
 	f, err := os.Create(servicePath)
 	if err != nil {
 		return trace.Wrap(trace.ConvertSystemError(err),
@@ -466,7 +463,7 @@ func unitPath(name string) (path string) {
 
 // DefaultUnitPath returns the default path for the specified systemd unit
 func DefaultUnitPath(name string) (path string) {
-	return filepath.Join(systemdUnitFileDir, SystemdNameEscape(name))
+	return filepath.Join(defaults.SystemUnitDir, SystemdNameEscape(name))
 }
 
 // serviceName returns just the name portion of the unit path.
