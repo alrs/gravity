@@ -70,11 +70,7 @@ func (r *InstallerStrategy) installSelfAsService() error {
 	}
 	req := systemservice.NewServiceRequest{
 		ServiceSpec: systemservice.ServiceSpec{
-			StartCommand: strings.Join(r.Args, " "),
-			StartPreCommands: []string{
-				removeSocketFileCommand(r.SocketPath),
-			},
-			// TODO(dmitri): run as euid?
+			StartCommand:             strings.Join(r.Args, " "),
 			User:                     constants.RootUIDString,
 			SuccessExitStatus:        successExitStatuses,
 			RestartPreventExitStatus: noRestartExitStatuses,

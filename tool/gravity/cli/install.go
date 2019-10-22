@@ -721,6 +721,9 @@ func NewServiceListener() (net.Listener, error) {
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
+	if err := os.RemoveAll(socketPath); err != nil {
+		return nil, trace.Wrap(trace.ConvertSystemError(err), "failed to remove installer socket")
+	}
 	return net.Listen("unix", socketPath)
 }
 
