@@ -506,7 +506,10 @@ func formatAbortError(err error) string {
 	case trace.Error:
 		userMessage := trace.UserMessage(err)
 		if err.OrigError() != nil {
-			userMessage = fmt.Sprintf("%v (%v)", userMessage, trace.UserMessage(err.OrigError()))
+			detail := trace.UserMessage(err.OrigError())
+			if detail != userMessage {
+				userMessage = fmt.Sprintf("%v (%v)", userMessage, detail)
+			}
 		}
 		return userMessage
 	default:

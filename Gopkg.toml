@@ -36,7 +36,8 @@ ignored = [
 
 [[override]]
   name = "github.com/mitchellh/go-ps"
-  branch = "master"
+  source = "github.com/gravitational/go-ps"
+  version = "=1.0.0"
 
 [[override]]
   name = "github.com/spf13/pflag"
@@ -64,7 +65,8 @@ ignored = [
 
 [[constraint]]
   name = "github.com/gravitational/satellite"
-  version = "=6.1.1"
+  #version = "=6.1.2"
+  branch = "dmitri/6.1.x/3224-selinux"
 
 [[constraint]]
   name = "github.com/miekg/dns"
@@ -132,6 +134,10 @@ ignored = [
   revision = "edc3ab29cdff8694dd6feb85cfeb4b5f1b38ed9c"
 
 [[constraint]]
+  name = "github.com/opencontainers/selinux"
+  version = "=v1.3.0"
+
+[[constraint]]
   name = "github.com/opencontainers/go-digest"
   version = "v1.0.0-rc1"
 
@@ -151,10 +157,11 @@ ignored = [
   source = "github.com/gravitational/certificate-transparency-go"
   branch = "version/5.0.x"
 
-[[constraint]]
+[[override]]
   name = "github.com/sirupsen/logrus"
   source = "github.com/gravitational/logrus"
-  version = "1.0.6"
+  #version = "=1.4.3"
+  branch = "dmitri/update-upstream"
 
 [[constraint]]
   name = "github.com/aws/aws-sdk-go"

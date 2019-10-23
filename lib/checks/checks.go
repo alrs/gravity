@@ -207,8 +207,8 @@ func RunLocalChecks(ctx context.Context, req LocalChecksRequest) error {
 		return trace.Wrap(err)
 	}
 	if len(result.GetFailed()) != 0 {
-		return trace.BadParameter(fmt.Sprintf("The following pre-flight checks failed:\n%v",
-			FormatFailedChecks(result.GetFailed())))
+		return trace.BadParameter("The following pre-flight checks failed:\n%v",
+			FormatFailedChecks(result.GetFailed()))
 	}
 	return nil
 }
