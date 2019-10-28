@@ -88,6 +88,11 @@ func InitAndCheck(g *Application, cmd string) error {
 	if *g.Debug {
 		level = logrus.DebugLevel
 	}
+	systemLogSet := true
+	if *g.SystemLogFile == "" {
+		systemLogSet = false
+		*g.SystemLogFile = defaults.GravitySystemLog
+	}
 	switch cmd {
 	case g.SiteStartCmd.FullCommand():
 		teleutils.InitLogger(teleutils.LoggingForDaemon, level)
@@ -135,6 +140,11 @@ func InitAndCheck(g *Application, cmd string) error {
 			if *g.SystemLogFile == defaults.GravitySystemLog {
 				utils.InitLogging(defaults.GravitySystemLogFile)
 			}
+		}
+	default:
+		if systemLogSet {
+			// For all commands, use the system log file explcitly set on command line
+			utils.InitLogging(*g.SystemLogFile)
 		}
 	}
 

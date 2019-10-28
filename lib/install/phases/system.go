@@ -31,7 +31,7 @@ import (
 )
 
 // NewSystem returns a new "system" phase executor
-func NewSystem(p fsm.ExecutorParams, operator ops.Operator, remote fsm.Remote) (*systemExecutor, error) {
+func NewSystem(p fsm.ExecutorParams, operator ops.Operator, remote fsm.Remote, systemLog, userLog string) (*systemExecutor, error) {
 	logger := &fsm.Logger{
 		FieldLogger: logrus.WithFields(logrus.Fields{
 			constants.FieldPhase:       p.Phase.ID,
@@ -46,6 +46,8 @@ func NewSystem(p fsm.ExecutorParams, operator ops.Operator, remote fsm.Remote) (
 		FieldLogger:    logger,
 		ExecutorParams: p,
 		remote:         remote,
+		systemLog:      systemLog,
+		userLog:        userLog,
 	}, nil
 }
 
@@ -55,7 +57,9 @@ type systemExecutor struct {
 	// ExecutorParams is common executor params
 	fsm.ExecutorParams
 	// remote specifies the server remote control interface
-	remote fsm.Remote
+	remote    fsm.Remote
+	systemLog string
+	userLog   string
 }
 
 // Execute executes the system phase
@@ -64,7 +68,10 @@ func (p *systemExecutor) Execute(ctx context.Context) error {
 	p.Progress.NextStep("Installing system service %v:%v",
 		locator.Name, locator.Version)
 	p.Infof("Installing system service %v:%v", locator.Name, locator.Version)
-	args := []string{"--debug", "system", "reinstall", locator.String()}
+	args := []string{"--debug", "system", "reinstall", locator.String(),
+		"--system-log-file", p.systemLog,
+		"--log-file", p.userLog,
+	}
 	if len(p.Phase.Data.Labels) != 0 {
 		labels := configure.KeyVal(p.Phase.Data.Labels)
 		args = append(args, "--labels", labels.String())

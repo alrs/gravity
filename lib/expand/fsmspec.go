@@ -84,7 +84,7 @@ func FSMSpec(config FSMConfig) fsm.FSMSpecFunc {
 		case strings.HasPrefix(p.Phase.ID, SystemPhase):
 			return installphases.NewSystem(p,
 				config.Operator,
-				remote)
+				remote, config.SystemLogFile, config.UserLogFile)
 
 		case strings.HasPrefix(p.Phase.ID, WaitPlanetPhase):
 			return phases.NewWaitPlanet(p,
