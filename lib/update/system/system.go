@@ -347,7 +347,7 @@ func (r *PackageUpdater) updatePlanetPackage(update storage.PackageUpdate) (labe
 		return nil, trace.Wrap(err)
 	}
 
-	err = applySelinuxFilecontexts(planetPath, r.FieldLogger)
+	err = r.applySelinuxFilecontexts(planetPath)
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
@@ -757,7 +757,37 @@ func unpack(packages update.LocalPackageService, loc loc.Locator) error {
 	return trace.Wrap(pack.Unpack(packages, loc, path, nil))
 }
 
-func applySelinuxFilecontexts(path string, logger logrus.FieldLogger) error {
+func (r *PackageUpdater) applySelinuxFilecontexts(containerPath string) error {
+	if !selinux.GetEnabled() {
+		r.Info("SELinux is disabled.")
+		return nil
+	}
+	rootfsDir := filepath.Join(containerPath, "rootfs")
+	args := []string{
+		"--directory", rootfsDir,
+		"--capability", "all",
+		"--machine", "relabel",
+		"--bind-ro", "/etc/selinux",
+		// Bind selinuxfs read/write as otherwise restorecon considers
+		// SELinux disabled
+		"--bind", "/sys/fs/selinux",
+		"--user", "root",
+		"restorecon", "-Rv", "/",
+	}
+	out, err := exec.Command("systemd-nspawn", args...).CombinedOutput()
+	r.WithFields(logrus.Fields{
+		logrus.ErrorKey: err,
+		"output":        string(out),
+	}).Info("Restoring file contexts.")
+	if err != nil {
+		r.WithError(err).Warn("Failed to restore file contexts.")
+		return trace.Wrap(err, "failed to restore file contexts on %v: %s",
+			containerPath, string(out))
+	}
+	return nil
+}
+
+func applySelinuxFilecontexts0(path string, logger logrus.FieldLogger) error {
 	if !selinux.GetEnabled() {
 		logger.Info("SELinux is disabled.")
 		return nil
