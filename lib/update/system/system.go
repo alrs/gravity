@@ -27,6 +27,7 @@ import (
 	"github.com/gravitational/gravity/lib/defaults"
 	"github.com/gravitational/gravity/lib/loc"
 	"github.com/gravitational/gravity/lib/localenv"
+	"github.com/gravitational/gravity/lib/log"
 	"github.com/gravitational/gravity/lib/pack"
 	"github.com/gravitational/gravity/lib/state"
 	libstatus "github.com/gravitational/gravity/lib/status"
@@ -228,8 +229,8 @@ type PackageUpdates struct {
 func (r *System) applyUpdates(updates []storage.PackageUpdate) error {
 	var errors []error
 	packageUpdater := &PackageUpdater{
-		FieldLogger: r.WithField(trace.Component, "update:package"),
-		Packages:    r.Packages,
+		Logger:   log.New(r.WithField(trace.Component, "update:package")),
+		Packages: r.Packages,
 	}
 	for _, u := range updates {
 		r.WithField("update", u).Info("Applying.")
@@ -337,35 +338,39 @@ func (r *PackageUpdater) updateGravityPackage(newPackage loc.Locator) (labelUpda
 func (r *PackageUpdater) updatePlanetPackage(update storage.PackageUpdate) (labelUpdates []pack.LabelUpdate, err error) {
 	var gravityPackageFilter = loc.MustCreateLocator(
 		defaults.SystemAccountOrg, constants.GravityPackage, loc.ZeroVersion)
-	err = r.Packages.Unpack(update.To, "")
-	if err != nil {
-		return nil, trace.Wrap(err, "failed to unpack package %v", update.To)
-	}
+	// FIXME: remove me, this is done by a prerequisite
+	// r.Info("Unpack planet package.")
+	// planetPath, err := unpack(r.Packages, update.To)
+	// if err != nil {
+	// 	return nil, trace.Wrap(err)
+	// }
 
 	planetPath, err := r.Packages.UnpackedPath(update.To)
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
-
-	err = r.applySelinuxFilecontexts(planetPath)
-	if err != nil {
-		return nil, trace.Wrap(err)
-	}
-
+	rootfsDir := filepath.Join(planetPath, constants.PlanetRootfs)
 	// Look up installed packages
 	gravityPackage, err := pack.FindInstalledPackage(r.Packages, gravityPackageFilter)
 	if err != nil {
 		return nil, trace.Wrap(err, "failed to find installed package for gravity")
 	}
 
+	// FIXME: this also needs the SELinux context
 	err = copyGravityToPlanet(*gravityPackage, r.Packages, planetPath)
 	if err != nil {
 		return nil, trace.Wrap(err, "failed to copy gravity inside planet")
 	}
 
-	err = updateKubectl(planetPath, r.FieldLogger)
+	err = updateKubectl(planetPath, r.Logger)
 	if err != nil {
 		r.WithError(err).Warn("kubectl will not work on host.")
+	}
+
+	r.Info("Apply SELinux file contexts.")
+	err = r.applySelinuxFilecontexts(rootfsDir)
+	if err != nil {
+		return nil, trace.Wrap(err)
 	}
 
 	labelUpdates, err = r.reinstallService(update)
@@ -381,6 +386,10 @@ func (r *PackageUpdater) updatePlanetPackage(update storage.PackageUpdate) (labe
 }
 
 func (r *PackageUpdater) updateTeleportPackage(update storage.PackageUpdate) (labelUpdates []pack.LabelUpdate, err error) {
+	_, err = unpack(r.Packages, update.To)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
 	updates, err := r.reinstallService(update)
 	if err != nil {
 		return nil, trace.Wrap(err)
@@ -447,16 +456,11 @@ func (r *PackageUpdater) reinstallService(update storage.PackageUpdate) (labelUp
 		return nil, trace.Wrap(err)
 	}
 
-	packageUpdates, err := uninstallPackage(services, update.From, r.FieldLogger)
+	packageUpdates, err := uninstallPackage(services, update.From, r.Logger)
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
 	labelUpdates = append(labelUpdates, packageUpdates...)
-
-	err = unpack(r.Packages, update.To)
-	if err != nil {
-		return nil, trace.Wrap(err)
-	}
 
 	manifest, err := r.Packages.GetPackageManifest(update.To)
 	if err != nil {
@@ -467,6 +471,7 @@ func (r *PackageUpdater) reinstallService(update storage.PackageUpdate) (labelUp
 			update.To)
 	}
 
+	// FIXME: move config package search/unpack outside
 	var configPackage loc.Locator
 	if update.ConfigPackage == nil {
 		existingConfig, err := pack.FindInstalledConfigPackage(r.Packages, update.From)
@@ -478,7 +483,7 @@ func (r *PackageUpdater) reinstallService(update storage.PackageUpdate) (labelUp
 		configPackage = update.ConfigPackage.To
 	}
 
-	err = unpack(r.Packages, configPackage)
+	_, err = unpack(r.Packages, configPackage)
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
@@ -509,16 +514,16 @@ func (r *PackageUpdater) reinstallService(update storage.PackageUpdate) (labelUp
 }
 
 func (r *PackageUpdater) checkAndSetDefaults() error {
-	if r.FieldLogger == nil {
-		r.FieldLogger = logrus.WithField(trace.Component, "update:package")
+	if r.Logger == nil {
+		r.Logger = log.New(logrus.WithField(trace.Component, "update:package"))
 	}
 	return nil
 }
 
 // PackageUpdater manages the updates to a known subset of packages
 type PackageUpdater struct {
-	// FieldLogger specifies the logger
-	logrus.FieldLogger
+	// Logger specifies the logger
+	log.Logger
 	// Packages specifies the package service to use
 	Packages update.LocalPackageService
 }
@@ -535,7 +540,7 @@ func getRuntimePackagePath(packages update.LocalPackageService) (packagePath str
 	return packagePath, nil
 }
 
-func updateKubectl(planetPath string, logger logrus.FieldLogger) (err error) {
+func updateKubectl(planetPath string, logger log.Logger) (err error) {
 	// update kubectl symlink
 	kubectlPath := filepath.Join(planetPath, constants.PlanetRootfs, defaults.KubectlScript)
 	var out []byte
@@ -646,7 +651,7 @@ func applyLabelUpdates(packages pack.PackageService, labelUpdates []pack.LabelUp
 func uninstallPackage(
 	services systemservice.ServiceManager,
 	servicePackage loc.Locator,
-	logger logrus.FieldLogger,
+	logger log.Logger,
 ) (updates []pack.LabelUpdate, err error) {
 	installed, err := services.IsPackageServiceInstalled(servicePackage)
 	if err != nil {
@@ -749,58 +754,52 @@ func getLocalNodeStatus(ctx context.Context) (err error) {
 
 // unpack reads the package from the package service and unpacks its contents
 // to the default package unpack directory
-func unpack(packages update.LocalPackageService, loc loc.Locator) error {
+func unpack(packages update.LocalPackageService, loc loc.Locator) (unpackedPath string, err error) {
 	path, err := packages.UnpackedPath(loc)
 	if err != nil {
-		return trace.Wrap(err)
+		return "", trace.Wrap(err)
 	}
-	return trace.Wrap(pack.Unpack(packages, loc, path, nil))
+	return path, pack.Unpack(packages, loc, path, nil)
 }
 
-func (r *PackageUpdater) applySelinuxFilecontexts(containerPath string) error {
+func (r *PackageUpdater) applySelinuxFilecontexts(rootfsDir string) error {
 	if !selinux.GetEnabled() {
 		r.Info("SELinux is disabled.")
 		return nil
 	}
-	rootfsDir := filepath.Join(containerPath, "rootfs")
-	args := []string{
-		"--directory", rootfsDir,
-		"--capability", "all",
-		"--machine", "relabel",
-		"--bind-ro", "/etc/selinux",
-		// Bind selinuxfs read/write as otherwise restorecon considers
-		// SELinux disabled
-		"--bind", "/sys/fs/selinux",
-		"--user", "root",
-		"restorecon", "-Rv", "/",
+	if err := r.updateRestoreconLabel(rootfsDir); err != nil {
+		return trace.Wrap(err)
 	}
-	out, err := exec.Command("systemd-nspawn", args...).CombinedOutput()
-	r.WithFields(logrus.Fields{
-		logrus.ErrorKey: err,
-		"output":        string(out),
-	}).Info("Restoring file contexts.")
+	return r.applyRootfsLabels(rootfsDir)
+}
+
+func (r *PackageUpdater) updateRestoreconLabel(rootfsDir string) error {
+	containerPath := filepath.Join(rootfsDir, defaults.RestoreconBin)
+	out, err := exec.Command("chcon", "--reference",
+		defaults.RestoreconBin, containerPath).CombinedOutput()
 	if err != nil {
-		r.WithError(err).Warn("Failed to restore file contexts.")
-		return trace.Wrap(err, "failed to restore file contexts on %v: %s",
-			containerPath, string(out))
+		r.WithFields(logrus.Fields{
+			logrus.ErrorKey: err,
+			"output":        string(out),
+		}).Warn("Restore context of restorecon.")
+		return trace.Wrap(err, "failed to restore context of restorecon: %s",
+			string(out))
 	}
 	return nil
 }
 
-func applySelinuxFilecontexts0(path string, logger logrus.FieldLogger) error {
-	if !selinux.GetEnabled() {
-		logger.Info("SELinux is disabled.")
-		return nil
-	}
-	out, err := exec.Command("restorecon", "-R", "-v", path).CombinedOutput()
-	logger.WithFields(logrus.Fields{
-		logrus.ErrorKey: err,
-		"output":        string(out),
-	}).Info("Restoring file contexts.")
+func (r *PackageUpdater) applyRootfsLabels(rootfsDir string) error {
+	args := utils.Self("system", "restore-fcontext", rootfsDir)
+	cmd := exec.Command(args[0], args[1:]...)
+	w := r.Logger.Writer()
+	defer w.Close()
+	cmd.Stdout = w
+	cmd.Stderr = w
+	err := cmd.Run()
 	if err != nil {
-		logger.WithError(err).Warn("Failed to restore file contexts.")
-		return trace.Wrap(err, "failed to restore file contexts on %v: %s",
-			path, string(out))
+		r.WithError(err).Warn("Failed to restore file contexts in rootfs.")
+		return trace.Wrap(err, "failed to restore file contexts on %v",
+			rootfsDir)
 	}
 	return nil
 }

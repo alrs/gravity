@@ -25,7 +25,6 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/gravitational/gravity/lib/constants"
 	"github.com/gravitational/gravity/lib/defaults"
 	"github.com/gravitational/gravity/lib/loc"
 	"github.com/gravitational/gravity/lib/utils"
@@ -446,9 +445,9 @@ func (s *systemdManager) supportsTasksAccounting() bool {
 }
 
 func invokeSystemctl(args ...string) (string, error) {
+	var out bytes.Buffer
 	cmd := exec.Command("systemctl", append(args, "--no-pager")...)
-	out := &bytes.Buffer{}
-	err := utils.ExecL(cmd, out, log.WithField(trace.Component, constants.ComponentSystem))
+	err := utils.Exec(cmd, &out)
 	return out.String(), trace.Wrap(err)
 }
 

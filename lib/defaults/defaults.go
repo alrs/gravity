@@ -323,6 +323,9 @@ const (
 	// JournalctlBin is the default location of the journalctl inside planet
 	JournalctlBin = "/usr/bin/journalctl"
 
+	// RestoreconBin is the default location of the restorecon executable inside planet
+	RestoreconBin = "/usr/sbin/restorecon"
+
 	// SystemctlBin is systemctl executable inside planet
 	SystemctlBin = "/bin/systemctl"
 
