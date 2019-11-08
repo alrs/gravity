@@ -767,30 +767,7 @@ func (r *PackageUpdater) applySelinuxFilecontexts(rootfsDir string) error {
 		r.Info("SELinux is disabled.")
 		return nil
 	}
-	if err := r.updateRestoreconLabel(rootfsDir); err != nil {
-		return trace.Wrap(err)
-	}
-	return r.applyRootfsLabels(rootfsDir)
-}
-
-func (r *PackageUpdater) updateRestoreconLabel(rootfsDir string) error {
-	containerPath := filepath.Join(rootfsDir, defaults.RestoreconBin)
-	out, err := exec.Command("chcon", "--reference",
-		defaults.RestoreconBin, containerPath).CombinedOutput()
-	if err != nil {
-		r.WithFields(logrus.Fields{
-			logrus.ErrorKey: err,
-			"output":        string(out),
-		}).Warn("Restore context of restorecon.")
-		return trace.Wrap(err, "failed to restore context of restorecon: %s",
-			string(out))
-	}
-	return nil
-}
-
-func (r *PackageUpdater) applyRootfsLabels(rootfsDir string) error {
-	args := utils.Self("system", "restore-fcontext", rootfsDir)
-	cmd := exec.Command(args[0], args[1:]...)
+	cmd := exec.Command("restorecon", "-Rv", rootfsDir)
 	w := r.Logger.Writer()
 	defer w.Close()
 	cmd.Stdout = w
@@ -803,3 +780,45 @@ func (r *PackageUpdater) applyRootfsLabels(rootfsDir string) error {
 	}
 	return nil
 }
+
+// func (r *PackageUpdater) applySelinuxFilecontexts(rootfsDir string) error {
+// 	if !selinux.GetEnabled() {
+// 		r.Info("SELinux is disabled.")
+// 		return nil
+// 	}
+// 	if err := r.updateRestoreconLabel(rootfsDir); err != nil {
+// 		return trace.Wrap(err)
+// 	}
+// 	return r.applyRootfsLabels(rootfsDir)
+// }
+
+// func (r *PackageUpdater) updateRestoreconLabel(rootfsDir string) error {
+// 	containerPath := filepath.Join(rootfsDir, defaults.RestoreconBin)
+// 	out, err := exec.Command("chcon", "--reference",
+// 		defaults.RestoreconBin, containerPath).CombinedOutput()
+// 	if err != nil {
+// 		r.WithFields(logrus.Fields{
+// 			logrus.ErrorKey: err,
+// 			"output":        string(out),
+// 		}).Warn("Restore context of restorecon.")
+// 		return trace.Wrap(err, "failed to restore context of restorecon: %s",
+// 			string(out))
+// 	}
+// 	return nil
+// }
+
+// func (r *PackageUpdater) applyRootfsLabels(rootfsDir string) error {
+// 	args := utils.Self("system", "restore-fcontext", rootfsDir)
+// 	cmd := exec.Command(args[0], args[1:]...)
+// 	w := r.Logger.Writer()
+// 	defer w.Close()
+// 	cmd.Stdout = w
+// 	cmd.Stderr = w
+// 	err := cmd.Run()
+// 	if err != nil {
+// 		r.WithError(err).Warn("Failed to restore file contexts in rootfs.")
+// 		return trace.Wrap(err, "failed to restore file contexts on %v",
+// 			rootfsDir)
+// 	}
+// 	return nil
+// }

@@ -345,8 +345,7 @@ func (i *Installer) stopWithContext(ctx context.Context, stoppers []signals.Stop
 	i.cancel()
 	i.wg.Wait()
 	i.dispatcher.Close()
-	err := i.runStoppers(ctx, stoppers)
-	return trace.Wrap(err)
+	return i.runStoppers(ctx, stoppers)
 }
 
 // Installer manages the installation process
