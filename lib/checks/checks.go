@@ -469,15 +469,15 @@ func (r *checker) checkDisks(ctx context.Context, server Server) error {
 	for _, target := range targets {
 		var maxBps uint64
 
-			// use the maximum throughput measured over a couple of tests
-			for i := 0; i < 3; i++ {
-				speed, err := r.checkServerDisk(ctx, server.Server, target.path)
-				if err != nil {
-					return trace.Wrap(err, "failed to sample disk performance at %v on %v",
-						target.path, server.ServerInfo.GetHostname())
-				}
-				maxBps = utils.MaxInt64(speed, maxBps)
+		// use the maximum throughput measured over a couple of tests
+		for i := 0; i < 3; i++ {
+			speed, err := r.checkServerDisk(ctx, server.Server, target.path)
+			if err != nil {
+				return trace.Wrap(err, "failed to sample disk performance at %v on %v",
+					target.path, server.ServerInfo.GetHostname())
 			}
+			maxBps = utils.MaxInt64(speed, maxBps)
+		}
 
 		if maxBps < target.rate.BytesPerSecond() {
 			return trace.BadParameter(
@@ -512,11 +512,11 @@ func (r *checker) checkServerDisk(ctx context.Context, server storage.Server, ta
 		"dd", "if=/dev/zero", fmt.Sprintf("of=%v", target),
 		"bs=100K", "count=1024", "conv=fdatasync"}, &out)
 	if err != nil {
-		log.WithFields(log.Fields{
-			log.ErrorKey: err,
-			"addr":       server.AdvertiseIP,
-			"target":     target,
-			"output":     out.String(),
+		log.WithFields(logrus.Fields{
+			logrus.ErrorKey: err,
+			"addr":          server.AdvertiseIP,
+			"target":        target,
+			"output":        out.String(),
 		}).Warn("Failed to sample disk performance.")
 		return 0, trace.Wrap(err, "failed to sample disk performance: %s", out.String())
 	}
@@ -536,11 +536,11 @@ func (r *checker) checkTempDir(ctx context.Context, server Server) error {
 
 	err := r.Remote.Exec(ctx, server.AdvertiseIP, []string{"touch", filename}, &out)
 	if err != nil {
-		log.WithFields(log.Fields{
-			log.ErrorKey: err,
-			"filename":   filename,
-			"addr":       server.AdvertiseIP,
-			"hostname":   server.ServerInfo.GetHostname(),
+		log.WithFields(logrus.Fields{
+			logrus.ErrorKey: err,
+			"filename":      filename,
+			"addr":          server.AdvertiseIP,
+			"hostname":      server.ServerInfo.GetHostname(),
 		}).Warn("Failed to create a test file.")
 		return trace.BadParameter("failed to create a test file %v on %q: %v",
 			filepath.Join(server.TempDir, filename), server.ServerInfo.GetHostname(), out.String())
@@ -548,8 +548,11 @@ func (r *checker) checkTempDir(ctx context.Context, server Server) error {
 
 	err = r.Remote.Exec(ctx, server.AdvertiseIP, []string{"rm", filename}, &out)
 	if err != nil {
-		log.Errorf("Failed to delete %v on %v: %v %v.",
-			filename, server.AdvertiseIP, trace.DebugReport(err), out.String())
+		log.WithFields(logrus.Fields{
+			"path":   filename,
+			"server": server.AdvertiseIP,
+			"output": out.String(),
+		}).Warn("Failed to delete.")
 	}
 
 	log.Infof("Server %q passed temp directory check: %v.",
