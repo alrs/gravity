@@ -55,8 +55,10 @@ func (r bashHistoryCollector) Collect(ctx context.Context, reportWriter FileWrit
 		path := filepath.Join(user.Home, bashHistoryFileName)
 		f, err := os.Open(path)
 		if err != nil {
-			log.Warningf("failed to fetch bash history for user %q: %v",
-				user.Name, trace.ConvertSystemError(err))
+			if !os.IsPermission(err) && !os.IsNotExist(err) {
+				log.Warnf("failed to fetch bash history for user %q: %v",
+					user.Name, trace.ConvertSystemError(err))
+			}
 			continue
 		}
 		defer f.Close()

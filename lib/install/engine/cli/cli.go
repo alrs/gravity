@@ -97,7 +97,7 @@ func (r *Engine) execute(ctx context.Context, installer install.Interface, confi
 	}
 	operation, err := e.upsertClusterAndOperation()
 	if err != nil {
-		return trace.Wrap(err, "failed to create cluster/operation")
+		return trace.Wrap(err)
 	}
 	if err := installer.NotifyOperationAvailable(*operation); err != nil {
 		return trace.Wrap(err)
@@ -140,7 +140,7 @@ func (r *executor) upsertClusterAndOperation() (*ops.SiteOperation, error) {
 	if len(clusters) == 0 {
 		cluster, err = r.Operator.CreateSite(r.NewCluster())
 		if err != nil {
-			return nil, trace.Wrap(err)
+			return nil, trace.Wrap(err, "failed to create cluster")
 		}
 	} else {
 		cluster = &clusters[0]
@@ -153,7 +153,7 @@ func (r *executor) upsertClusterAndOperation() (*ops.SiteOperation, error) {
 	if len(operations) == 0 {
 		operation, err = r.createOperation()
 		if err != nil {
-			return nil, trace.Wrap(err)
+			return nil, trace.Wrap(err, "failed to create install operation")
 		}
 	} else {
 		operation = (*ops.SiteOperation)(&operations[0])
