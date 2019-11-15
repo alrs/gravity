@@ -1025,12 +1025,12 @@
   revision = "de3929eb86f7cc3411acde9ff93ed7c528e8f5d4"
 
 [[projects]]
-  branch = "dmitri/6.1.x/3224-selinux-container"
-  digest = "1:5529d452a25456c694745b8ddfacb03d07a1ff6fd4d306435bb30b2ea29e0168"
+  branch = "dmitri/proxy-error"
+  digest = "1:514496dc16ad575435c59c08acc7eb29a07b90963666ddf89d45831591578b87"
   name = "github.com/gravitational/trace"
   packages = ["."]
   pruneopts = "UT"
-  revision = "f528ec3d6b6ea22924e336533306488438c40f6e"
+  revision = "ad4beb9c48233773b91ae80c5e1b6c3ee755436a"
 
 [[projects]]
   digest = "1:841d5835e94129658adabece66a4cc54d2cec9a40fa8b51743ea35d0519dd6c2"

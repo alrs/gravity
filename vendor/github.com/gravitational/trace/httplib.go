@@ -56,32 +56,32 @@ func ErrorToCode(err error) int {
 // ReadError converts http error to internal error type
 // based on HTTP response code and HTTP body contents
 // if status code does not indicate error, it will return nil
-func ReadError(statusCode int, re []byte) error {
-	var e error
-	switch statusCode {
-	case http.StatusNotFound:
-		e = &NotFoundError{Message: string(re)}
-	case http.StatusBadRequest:
-		e = &BadParameterError{Message: string(re)}
-	case http.StatusNotImplemented:
-		e = &NotImplementedError{Message: string(re)}
-	case http.StatusPreconditionFailed:
-		e = &CompareFailedError{Message: string(re)}
-	case http.StatusForbidden:
-		e = &AccessDeniedError{Message: string(re)}
-	case http.StatusConflict:
-		e = &AlreadyExistsError{Message: string(re)}
-	case http.StatusTooManyRequests:
-		e = &LimitExceededError{Message: string(re)}
-	case http.StatusGatewayTimeout:
-		e = &ConnectionProblemError{Message: string(re)}
-	default:
-		if statusCode < 200 || statusCode >= 400 {
-			return Errorf(string(re))
-		}
+func ReadError(statusCode int, respBytes []byte) error {
+	if statusCode >= http.StatusOK && statusCode < http.StatusBadRequest {
 		return nil
 	}
-	return unmarshalError(e, re)
+	var err error
+	switch statusCode {
+	case http.StatusNotFound:
+		err = &NotFoundError{}
+	case http.StatusBadRequest:
+		err = &BadParameterError{}
+	case http.StatusNotImplemented:
+		err = &NotImplementedError{}
+	case http.StatusPreconditionFailed:
+		err = &CompareFailedError{}
+	case http.StatusForbidden:
+		err = &AccessDeniedError{}
+	case http.StatusConflict:
+		err = &AlreadyExistsError{}
+	case http.StatusTooManyRequests:
+		err = &LimitExceededError{}
+	case http.StatusGatewayTimeout:
+		err = &ConnectionProblemError{}
+	default:
+		err = &externalError{}
+	}
+	return wrapProxy(unmarshalError(err, respBytes))
 }
 
 func replyJSON(w http.ResponseWriter, code int, err error) {
@@ -94,7 +94,7 @@ func replyJSON(w http.ResponseWriter, code int, err error) {
 		// otherwise capture error message and marshal it explicitly
 		var obj interface{} = err
 		if _, ok := err.(*TraceErr); !ok {
-			obj = message{Message: err.Error()}
+			obj = externalError{Message: err.Error()}
 		}
 		out, err = json.MarshalIndent(obj, "", "    ")
 		if err != nil {
@@ -105,12 +105,21 @@ func replyJSON(w http.ResponseWriter, code int, err error) {
 		if terr, ok := err.(Error); ok {
 			innerError = terr.OrigError()
 		}
-		out, err = json.Marshal(message{Message: innerError.Error()})
+		out, err = json.Marshal(externalError{Message: innerError.Error()})
+		if err != nil {
+			out = []byte(fmt.Sprintf(`{"message": "internal marshal error: %v"}`, err))
+		}
 	}
 	w.Write(out)
 }
 
-type message struct {
+// Error returns the underlying message
+func (r *externalError) Error() string {
+	return r.Message
+}
+
+type externalError struct {
+	// Message specifies the error message
 	Message string `json:"message"`
 }
 
