@@ -88,9 +88,24 @@ spec:
         exclude: ["CLOUDBYT", "OpenEBS"]
 ```
 
-!!! note "Default filters"
-    Default OpenEBS filters will be merged with the filters configured via
-    a `PersistentStorage` resource so you don't need to add them explicitly.
+The presence of include vs exclude filters affects which devices get discovered
+by OpenEBS. The behavior is as follows:
+
+* If `include` filter is present, only matching devices will be selected.
+* If `include` filter is empty, all devices will be selected, except for those
+  matching `exclude` filters.
+
+Note that the `mountPoints` filter provides only the `exclude` rule. See
+[Include filters](https://docs.openebs.io/docs/next/ugndm.html#Include-filters) and
+[Exclude filters](https://docs.openebs.io/docs/next/ugndm.html#Exclude-filters)
+OpenEBS documentation for more details.
+
+The default OpenEBS filters will be merged with the filters configured via a
+`PersistentStorage` resource. The default filters are:
+
+* Exclude devices: `loop`, `/dev/fd0`, `/dev/sr0`, `/dev/ram`, `/dev/dm-`, `/dev/md`.
+* Exclude vendors: `CLOUDBYT`, `OpenEBS`.
+* Exclude mount points: `/`, `/etc/hosts`, `/boot`.
 
 Suppose that we want to include only two specific devices, `/dev/sdd` and
 `/dev/sde`, in the OpenEBS pool. Let's define the following resource in a
@@ -130,8 +145,21 @@ The devices that are currently being managed by OpenEBS will appear in the
 a filter, it will stay among the block devices list in the `Unknown` state and
 won't be allocated for persistent storage anymore.
 
-!!! note "Per-node configuration"
-    At the moment OpenEBS does not support specifying filters on a per-node basis.
+### Per-Node OpenEBS Configuration
+
+At the moment OpenEBS does not support specifying filters on a per-node basis.
+It is possible, however, to entirely exclude devices on some nodes from being
+discovered by OpenEBS by setting a `gravitational.io/no-storage` label on those
+nodes.
+
+For example, a label can be set via a node profile in the manifest file:
+
+```yaml
+nodeProfiles:
+- name: node
+  labels:
+    gravitational.io/no-storage: "true"
+```
 
 ### Configure OpenEBS at Install Time
 
@@ -162,8 +190,6 @@ storage in a cluster:
 See OpenEBS documentation on [LocalPV](https://docs.openebs.io/docs/next/localpv.html)
 and [cStor](https://docs.openebs.io/docs/next/cstor.html) for detailed information
 about these storage engines.
-
-Let's take a look at using them inside Gravity.
 
 ## Local Provisioner / Host Volumes
 
@@ -212,8 +238,8 @@ If you want to keep the local volumes data on a separate device, it is a common
 practice to mount it under `/var/lib/gravity/openebs/local` before initial
 cluster installation.
 
-Alternatively, you can also create another storage class that will use the
-host volume provisioner like described [OpenEBS documentation](https://docs.openebs.io/docs/next/localpv.html#how-to-use-openebs-local-pvs)
+Alternatively, you can create another storage class that will use the
+host volume provisioner as described in [OpenEBS documentation](https://docs.openebs.io/docs/next/localpv.html#how-to-use-openebs-local-pvs)
 and use it in your persistent volume claims instead of the default one.
 
 ## Local Provisioner / Block Devices

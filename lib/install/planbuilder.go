@@ -355,10 +355,13 @@ func (b *PlanBuilder) AddRBACPhase(plan *storage.OperationPlan) {
 }
 
 // AddOpenEBSPhase appends phase that creates OpenEBS configuration.
-func (b *PlanBuilder) AddOpenEBSPhase(plan *storage.OperationPlan) error {
-	bytes, err := storage.MarshalPersistentStorage(b.PersistentStorage)
-	if err != nil {
-		return trace.Wrap(err)
+func (b *PlanBuilder) AddOpenEBSPhase(plan *storage.OperationPlan) (err error) {
+	var bytes []byte
+	if b.PersistentStorage != nil {
+		bytes, err = storage.MarshalPersistentStorage(b.PersistentStorage)
+		if err != nil {
+			return trace.Wrap(err)
+		}
 	}
 	plan.Phases = append(plan.Phases, storage.OperationPhase{
 		ID:          phases.OpenEBSPhase,

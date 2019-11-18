@@ -33,38 +33,38 @@ type AppUtilsSuite struct{}
 var _ = Suite(&AppUtilsSuite{})
 
 func (s *AppUtilsSuite) TestUpdatedDependencies(c *C) {
-	manifest1, err := schema.ParseManifestYAMLNoValidate([]byte(app1Manifest))
+	manifest, err := schema.ParseManifestYAMLNoValidate([]byte(appManifest))
 	c.Assert(err, IsNil)
-	app1 := Application{
+	app := Application{
 		Package: loc.MustParseLocator("repo/app:1.0.0"),
 		PackageEnvelope: pack.PackageEnvelope{
-			Manifest: []byte(app1Manifest),
+			Manifest: []byte(appManifest),
 		},
-		Manifest: *manifest1,
+		Manifest: *manifest,
 	}
-	manifest2, err := schema.ParseManifestYAMLNoValidate([]byte(app2Manifest))
+	updateManifest, err := schema.ParseManifestYAMLNoValidate([]byte(updateAppManifest))
 	c.Assert(err, IsNil)
-	app2 := Application{
+	updateApp := Application{
 		Package: loc.MustParseLocator("repo/app:2.0.0"),
 		PackageEnvelope: pack.PackageEnvelope{
-			Manifest: []byte(app2Manifest),
+			Manifest: []byte(updateAppManifest),
 		},
-		Manifest: *manifest2,
+		Manifest: *updateManifest,
 	}
 
-	updates, err := GetUpdatedDependencies(app1, app2, *manifest1, *manifest2)
+	updates, err := GetUpdatedDependencies(app, updateApp, *manifest, *updateManifest)
 	c.Assert(err, IsNil)
 	c.Assert(updates, DeepEquals, []loc.Locator{
 		loc.MustParseLocator("repo/dep-2:2.0.0"),
 		loc.MustParseLocator("repo/app:2.0.0"),
 	})
 
-	updates, err = GetUpdatedDependencies(app1, app1, *manifest1, *manifest1)
+	updates, err = GetUpdatedDependencies(app, app, *manifest, *manifest)
 	c.Assert(err, IsNil)
 	c.Assert(updates, DeepEquals, []loc.Locator(nil))
 }
 
-const app1Manifest = `apiVersion: bundle.gravitational.io/v2
+const appManifest = `apiVersion: bundle.gravitational.io/v2
 kind: Bundle
 metadata:
   name: app
@@ -74,7 +74,7 @@ dependencies:
     - repo/dep-1:1.0.0
     - repo/dep-2:1.0.0`
 
-const app2Manifest = `apiVersion: bundle.gravitational.io/v2
+const updateAppManifest = `apiVersion: bundle.gravitational.io/v2
 kind: Bundle
 metadata:
   name: app

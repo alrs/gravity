@@ -367,26 +367,26 @@ func (c *NDMConfig) SetDeviceIncludes(includes []string) {
 func DefaultNDMConfig() *NDMConfig {
 	return &NDMConfig{
 		ProbeConfigs: []*NDMProbe{
-			{Name: "udev probe", Key: "udev-probe", State: true},
-			{Name: "searchest probe", Key: "searchest-probe", State: false},
-			{Name: "smart probe", Key: "smart-probe", State: true},
+			{Name: "udev probe", Key: udevProbe, State: true},
+			{Name: "searchest probe", Key: searchestProbe, State: false},
+			{Name: "smart probe", Key: smartProbe, State: true},
 		},
 		FilterConfigs: []*NDMFilter{
 			{
 				Name:    "os disk exclude filter",
-				Key:     "os-disk-exclude-filter",
+				Key:     osDiskFilter,
 				State:   true,
 				Exclude: strings.Join(defaultExcludeMounts, ","),
 			},
 			{
 				Name:    "vendor filter",
-				Key:     "vendor-filter",
+				Key:     vendorFilter,
 				State:   true,
 				Exclude: strings.Join(defaultExcludeVendors, ","),
 			},
 			{
 				Name:    "path filter",
-				Key:     "path-filter",
+				Key:     pathFilter,
 				State:   true,
 				Exclude: strings.Join(defaultExcludeDevices, ","),
 			},
@@ -394,10 +394,19 @@ func DefaultNDMConfig() *NDMConfig {
 	}
 }
 
+const (
+	udevProbe      = "udev-probe"
+	searchestProbe = "searchest-probe"
+	smartProbe     = "smart-probe"
+	osDiskFilter   = "os-disk-exclude-filter"
+	vendorFilter   = "vendor-filter"
+	pathFilter     = "path-filter"
+)
+
 // NDMConfigFromConfigMap creates NDM config from the provided config map.
 func NDMConfigFromConfigMap(cm *v1.ConfigMap) (*NDMConfig, error) {
-	data, ok := cm.Data["node-disk-manager.config"]
-	if !ok || len(data) == 0 {
+	data := cm.Data["node-disk-manager.config"]
+	if len(data) == 0 {
 		return nil, trace.BadParameter("config map %v does not contain node disk manager configuration", cm.Name)
 	}
 	var config NDMConfig
@@ -460,7 +469,7 @@ type NDMFilter struct {
 	State bool `yaml:"state"`
 	// Include is a list of includes for this filter.
 	Include string `yaml:"include,omitempty"`
-	// Exclude is a list of excludes for htis filter.
+	// Exclude is a list of excludes for this filter.
 	Exclude string `yaml:"exclude,omitempty"`
 }
 

@@ -88,7 +88,7 @@ func (r *openebs) createNamespace() error {
 	})
 	if err != nil {
 		if !trace.IsAlreadyExists(rigging.ConvertError(err)) {
-			return trace.Wrap(err)
+			return trace.Wrap(err).AddField("namespace", defaults.OpenEBSNamespace)
 		}
 		r.WithField("name", defaults.OpenEBSNamespace).Info("Namespace already exists.")
 	} else {
@@ -106,7 +106,10 @@ func (r *openebs) createConfigMap(config *storage.NDMConfig) error {
 	_, err = r.Client.CoreV1().ConfigMaps(defaults.OpenEBSNamespace).Create(configMap)
 	if err != nil {
 		if !trace.IsAlreadyExists(rigging.ConvertError(err)) {
-			return trace.Wrap(err)
+			return trace.Wrap(err).AddFields(map[string]interface{}{
+				"namespace": defaults.OpenEBSNamespace,
+				"name":      configMap.Name,
+			})
 		}
 		r.WithField("name", configMap.Name).Info("Config map already exists.")
 	} else {
