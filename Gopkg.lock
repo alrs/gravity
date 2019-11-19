@@ -1026,11 +1026,11 @@
 
 [[projects]]
   branch = "dmitri/proxy-error"
-  digest = "1:514496dc16ad575435c59c08acc7eb29a07b90963666ddf89d45831591578b87"
+  digest = "1:5074213ba152341f56fb1896c4a7cfd720f08c863396098092553ffb9cec6d82"
   name = "github.com/gravitational/trace"
   packages = ["."]
   pruneopts = "UT"
-  revision = "ad4beb9c48233773b91ae80c5e1b6c3ee755436a"
+  revision = "ac25e3409e36e0218cb660dea26cfc4c404dfca0"
 
 [[projects]]
   digest = "1:841d5835e94129658adabece66a4cc54d2cec9a40fa8b51743ea35d0519dd6c2"

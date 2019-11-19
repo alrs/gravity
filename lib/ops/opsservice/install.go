@@ -332,6 +332,7 @@ func (s *site) updateOperationState(op *ops.SiteOperation, req ops.OperationUpda
 			ops.OperationStateInstallInitiated,
 			ops.OperationStateInstallProvisioning,
 			ops.OperationStateReady,
+			ops.OperationStateFailed,
 		}
 		newState = ops.OperationStateInstallPrechecks
 	case ops.OperationExpand:
@@ -339,6 +340,7 @@ func (s *site) updateOperationState(op *ops.SiteOperation, req ops.OperationUpda
 			ops.OperationStateExpandInitiated,
 			ops.OperationStateExpandProvisioning,
 			ops.OperationStateReady,
+			ops.OperationStateFailed,
 		}
 		newState = ops.OperationStateExpandPrechecks
 	default:

@@ -251,11 +251,7 @@ func (i *Installer) maybeStartAgent() error {
 func (i *Installer) execute(req *installpb.ExecuteRequest) (dispatcher.Status, error) {
 	i.WithField("req", req).Info("Execute.")
 	existingOperation, _ := ops.GetWizardOperation(i.config.Operator)
-	if req.HasSpecificPhase() || existingOperation != nil {
-		// FIXME(dmitri): for now, fallback to installing via state machine even for
-		// requests with empty phase (i.e. execute from scratch type) if there's an existing
-		// operation.
-		// A lot more needs to be refactored to support resumption in the engine branch
+	if req.HasSpecificPhase() {
 		phase := req.Phase
 		if phase == nil {
 			phase = phaseForOperation(*existingOperation)
@@ -278,9 +274,7 @@ func (i *Installer) executePhase(phase installpb.Phase) (dispatcher.Status, erro
 	progressReporter := dispatcher.NewProgressReporter(i.ctx, i.dispatcher, phaseTitle(phase))
 	defer progressReporter.Stop()
 	if phase.IsResume() {
-		err := ExecuteOperation(i.ctx, machine,
-			progressReporter,
-			i.FieldLogger)
+		err := i.ExecuteOperation(opKey)
 		if err != nil {
 			return dispatcher.StatusUnknown, trace.Wrap(err)
 		}
