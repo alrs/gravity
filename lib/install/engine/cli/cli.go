@@ -83,9 +83,10 @@ func (r *Engine) Execute(ctx context.Context, installer install.Interface, confi
 }
 
 func (r *Engine) execute(ctx context.Context, installer install.Interface, config install.Config) (err error) {
-	if err := r.validate(ctx, config); err != nil {
-		return trace.Wrap(err)
-	}
+	// FIXME: this only needs to run at the very beginning - why is this not part of the operation plan?
+	// if err := r.validate(ctx, config); err != nil {
+	// 	return trace.Wrap(err)
+	// }
 	e := executor{
 		Config:    r.Config,
 		Interface: installer,
