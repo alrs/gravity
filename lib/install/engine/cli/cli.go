@@ -83,10 +83,6 @@ func (r *Engine) Execute(ctx context.Context, installer install.Interface, confi
 }
 
 func (r *Engine) execute(ctx context.Context, installer install.Interface, config install.Config) (err error) {
-	// FIXME: this only needs to run at the very beginning - why is this not part of the operation plan?
-	// if err := r.validate(ctx, config); err != nil {
-	// 	return trace.Wrap(err)
-	// }
 	e := executor{
 		Config:    r.Config,
 		Interface: installer,
@@ -117,10 +113,6 @@ func (r *Engine) execute(ctx context.Context, installer install.Interface, confi
 		r.WithError(err).Warn("Failed to finalize install.")
 	}
 	return nil
-}
-
-func (r *Engine) validate(ctx context.Context, config install.Config) (err error) {
-	return trace.Wrap(config.RunLocalChecks(ctx))
 }
 
 // bootstrap prepares for the installation
